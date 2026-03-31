@@ -1,0 +1,235 @@
+# Hall of Automata — Agent Registry
+#
+# This is the live catalog. Old Major reads from and writes to this file directly.
+# On automaton onboarding, Old Major adds the new agent entry here and commits
+# roster/<slug>.md in the same push — no external store, no deployment payload.
+#
+# To add a new automaton: open the onboarding issue template.
+#
+# Token model: CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>
+# environments. Automata do not hold their own tokens — they run
+# under a pool-selected invoker's credential.
+
+meta:
+  onboarding_template: .github/ISSUE_TEMPLATE/new-automaton.yml
+
+agents:
+
+  old-major:
+    display_name: "Old Major 🏛️"
+    # Persona: roster/old-major.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-haiku-4-5-20251001  # triage/routing — fast, cheap
+    max_turns: 20
+    max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,labels,pull_requests"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__github__search_issues
+        - mcp__github__create_label
+        - mcp__github__update_label
+        - mcp__github__add_labels_to_issue
+        - mcp__github__list_labels_for_repo
+    catalog:
+      roles: [triage, route, onboard, synthesize]
+      domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding, invoker-management, automata-management]
+      scope_summary: >
+        Entry point for all unlabeled invocations. Reads the roster catalog, picks the right
+        specialist, synthesizes task context. Does not implement code or open PRs.
+
+  hamlet:
+    display_name: "Hamlet 🐗"
+    # Persona: roster/hamlet.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    invoker: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 40
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: clangd
+          lsp_args: ["--compile-commands-dir={{workspace}}"]
+          setup: scripts/setup-lsp-cpp.sh
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_diagnostic
+        - mcp__lsp__textDocument_hover
+    catalog:
+      roles: [implement, debug, triage]
+      domains: [cpp, build-systems, debugging]
+      scope_summary: >
+        C++17 high-performance specialist — implements features, fixes bugs, and investigates
+        runtime misbehaviours in Bazel-managed codebases, working from CI output rather than
+        running builds inline.
+
+  pyrate:
+    display_name: "Captain Pyrate 🦜"
+    # Persona: roster/pyrate.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: fpetracci
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 40
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: pyright-langserver
+          lsp_args: ["--stdio"]
+          setup: scripts/setup-lsp-python.sh
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_diagnostic
+        - mcp__lsp__textDocument_hover
+    catalog:
+      roles: [implement, debug]
+      domains: [python]
+      scope_summary: >
+        Python software engineering specialist — implements features, fixes bugs, and handles
+        packaging and deployment in Bazel-managed and uv-managed Python codebases.
+
+  mergio:
+    display_name: "mergio 🤘"
+    # Persona: roster/mergio.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    invoker: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 40
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+    catalog:
+      roles: [implement, debug, triage]
+      domains: [ci-cd, git-ops, build-systems, infrastructure, deployment, pipeline-triage]
+      scope_summary: >
+        CI/CD architect and pipeline enforcer — designs, fixes, and optimizes GitHub Actions
+        workflows, build systems, and deployment pipelines with zero tolerance for broken gates.
+
+  frontenzo:
+    display_name: "Frontenzo 🎨"
+    # Persona: roster/frontenzo.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+    catalog:
+      roles: [advise, review, research]
+      domains: [frontend-architecture, ux-ui, web-performance, accessibility, frontend-security, web-inspection]
+      scope_summary: >
+        Frontend design critic and advisor — reviews live sites and codebases for UX, performance,
+        accessibility, and security issues, and prescribes technology and architecture choices
+        with beauty as a first-order constraint.
+
+  aeeeiii:
+    display_name: "AEEEEEIII 🐑"
+    # Persona: roster/aeeeiii.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-opus-4-6
+    max_turns: 20
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+    catalog:
+      roles: [research, advise, synthesize]
+      domains: [perception, environment-modeling, computer-vision, autonomous-systems, ai-research-synthesis]
+      scope_summary: >
+        Deep research and advising on AI perception, environment modeling, and computer vision —
+        literature synthesis, paper analysis, and conceptual guidance for autonomous systems work.
+
+  tomashco:
+    display_name: "Tomashco 🛹"
+    # Persona: roster/tomashco.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+    catalog:
+      roles: [advise, research, triage]
+      domains: [api-design, event-driven-architecture, data-security, backend-triage]
+      scope_summary: >
+        Backend architecture advisor — analyzes system design, API contracts, event-driven
+        patterns, and data security concerns; scopes work and prescribes the approach for
+        downstream implementation agents.
