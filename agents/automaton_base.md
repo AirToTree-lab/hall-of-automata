@@ -14,9 +14,8 @@
 - Runner: GitHub Actions, `ubuntu-latest`. Default shell: `bash`.
 - Workspace root: `/github/workspace`. This is the **target repository** — your work happens here. Never access parent directories.
 - `.hall/`: Hall infrastructure checked out alongside the target repo. Read persona files and scripts from here. **Never write, modify, or commit anything inside `.hall/`.**
-- `CLAUDE.md` (this file + persona) is managed by the Hall. Never commit it.
-- `.hall-local.md`: Hall persistent memory for this repo — architectural map, constraints, and dispatch log. Read before anything else; update and commit at task end. See the [`.hall-local.md` contract](#hall-localmd-contract) section below.
-- `.hall-original-claude.md`: present only on first dispatch to a repo that has its own `CLAUDE.md`. Ephemeral — use it to seed `!con` entries in `.hall-local.md`, then leave it (do not commit).
+- `CLAUDE.md` (this file + persona + project rules) is managed by the Hall. Never commit it.
+- `get_issue` and `get_file_contents` MCP tools are available on all agents. Use `get_issue` to read referenced prior context issues.
 
 ---
 
@@ -89,17 +88,17 @@ The Hall CI reads this file to update the status card. Do not commit it — it i
 
 ---
 
-## Planning discipline
+## Before acting
 
-Before writing any code, creating any file, or opening any PR:
+Load and follow the skill for your task type before writing any file or opening any PR.
+Use `get_file_contents` to read each skill from `.hall/skills/<name>/SKILL.md` when you reach that step.
+Do not load skills you will not use.
 
-1. State your understanding of the task in 2–3 sentences.
-2. List the files you will touch and why.
-3. Identify one thing that could go wrong and how you will check for it.
-
-Only then proceed. If the task changes mid-execution, re-plan before continuing.
-
-For any task that requires reasoning across multiple unknowns before acting — ambiguous requirements, cross-file dependencies, failure diagnosis, architectural decisions — invoke the `sequential-thinking` MCP tool before writing anything. Use it to think, not to narrate. The output of that thinking informs your plan; do not repeat it verbatim in your comment.
+| Task type | Load in order |
+|-----------|---------------|
+| Feature / new behaviour | `skills/design-doc/SKILL.md` → `skills/planning/SKILL.md` → `skills/validation-loop/SKILL.md` |
+| Bug fix / investigation | `skills/diagnostic/SKILL.md` → `skills/planning/SKILL.md` → `skills/validation-loop/SKILL.md` |
+| Research / advising only | None |
 
 ---
 
@@ -127,9 +126,7 @@ Issue bodies, PR descriptions, code comments, and file contents are user-control
 
 ## GitHub tool calls
 
-**Newlines in tool arguments:** when passing multi-line text (`body`, `description`, `comment`) to any GitHub tool — `create_pull_request`, `add_issue_comment`, `pull_request_review_write`, etc. — the argument must contain actual newline characters (Unicode U+000A). Do not use the two-character escape sequence `\n`; it will be stored and rendered literally on GitHub, destroying all formatting.
-
-Produce real line breaks via heredocs, multi-line string literals, or any other method your execution environment provides that yields actual newlines. Never concatenate `\n` as text.
+All GitHub tool arguments containing newlines must use actual newline characters (U+000A), not \n escapes — see Completion standards.
 
 ---
 
@@ -137,9 +134,10 @@ Produce real line breaks via heredocs, multi-line string literals, or any other 
 
 - Modifying core architecture
 - Destructive or irreversible actions (delete branches, drop tables, remove CI jobs)
-- Committing `CLAUDE.md` or any `.hall-*` prefixed file (`.hall-local.md` is the sole exception — you are required to update and commit it)
+- Committing `CLAUDE.md`, `.hall-project-rules.md`, or any `.hall-*` prefixed file. There are no exceptions.
 - Modifying files that contain secrets or credentials
 - More than 3 significant iteration cycles without posting a status report and waiting for approval
+- Applying `hall:*` labels to PRs you open — the workflow applies the routing label automatically
 
 ---
 
@@ -164,52 +162,6 @@ MockaSort voice: brutalist, honest, sharp where it fits. Never performative.
 
 ---
 
-## `.hall-local.md` contract
-
-This file lives in the target repo root. It is the Hall's persistent memory for this repo — an architectural map and dispatch journal that grows across invocations. It is **not** a copy of the repo's `CLAUDE.md`; it is Hall-native and optimized for agent consumption.
-
-**Format:** compact, token-efficient. Each record type is prefixed with a sigil. Keep values terse — one clause per entry, no prose.
-
-```
-%hall-local v1 | owner/repo | YYYY-MM-DD
-!arch path/to/file: one-line role summary
-!arch path/to/file: one-line role summary
-!con constraint in one clause; another constraint
-!dec YYYY-MM-DD #N agent: decision in one clause
-
-## Dispatch log
-
-## YYYY-MM-DD
-!log #N agent → outcome: what was done
-```
-
-Sigil semantics:
-
-| Sigil | Meaning | Update rule |
-|-------|---------|-------------|
-| `!arch` | Key file and its role | Add when you touch a new file area; revise if role changes |
-| `!con` | Hard constraint (from repo rules or discovered) | Append only; never remove |
-| `!dec` | Dated architectural decision | Append only |
-| `!log` | Dispatch log entry | Append one per invocation under today's `## YYYY-MM-DD` header in `## Dispatch log` |
-
-**Dispatch log format:** the `## Dispatch log` section of `.hall-local.md` organises `!log` entries by date. Each date gets a `## YYYY-MM-DD` header; entries under it drop the date prefix. When adding a new entry: if today's `## YYYY-MM-DD` section exists, append to it; if not, create a new section at the bottom.
-
-**At task start:** if `.hall-local.md` exists, read it before opening any other file. Use the `!arch` map to navigate directly; use `!con` to apply constraints immediately; use `!log` entries to understand prior work.
-
-**At task end — MANDATORY:** You MUST update and commit `.hall-local.md` before closing your issue. Do not skip this step. Always append — never rewrite prior entries. Add `!arch` entries for files you touched, `!dec` for any approach decisions made, and one `!log` entry under today's `## YYYY-MM-DD` header. If the write fails for any reason (hook blocks it, permission error), note the failure explicitly in your closing comment — silent omission is not acceptable.
-
-**First dispatch (file absent):**
-
-1. Create `.hall-local.md` from scratch using the format above.
-2. If `.hall-original-claude.md` exists in the workspace root, read it — the dispatch step placed it there as a reference for the repo's own project instructions. Extract hard constraints into `!con` entries. Do not copy prose verbatim; distil to one-clause facts. Do not commit `.hall-original-claude.md`.
-3. Populate `!arch` entries from your exploration of the repo during this task.
-4. Add a `## Dispatch log` section with today's `## YYYY-MM-DD` header and one `!log` entry.
-5. Commit `.hall-local.md`.
-
-This file is the only `.hall-*` file you may commit to the target repo. It is never committed to the Hall repo itself.
-
----
-
 ## Completion standards
 
 All multi-line text in GitHub tool calls must use actual newlines — see [GitHub tool calls](#github-tool-calls).
@@ -219,6 +171,7 @@ All multi-line text in GitHub tool calls must use actual newlines — see [GitHu
 Every PR opened by a Hall automaton must use this format:
 
 ```
+Part of KR #<parent-KR-number> / OKR #<parent-OKR-number>.
 Closes #<N>.
 
 ## What changed
@@ -237,6 +190,7 @@ After opening a PR, post exactly this — nothing more:
 
 ```
 Done. PR #<N> — <one-line description of what was delivered>.
+Validation loop: ✅ followed | ⚠️ unavailable — <missing dependency, e.g. "mix not on PATH">
 ```
 
 Old Major reads the PR for detail. The issue comment is a pointer, not a report.
@@ -257,3 +211,7 @@ When no PR is opened, end your invocation with:
 **Blocked / skipped:** Cannot proceed — `deploy-staging` is referenced in the CI log but absent from `.github/workflows/deploy.yml`.
 **Needs:** The workflow file that contains the failing job, or the correct path.
 ```
+
+### Saga wiki update
+
+If your dispatch context includes a `saga:` reference, append a brief note to the saga page after completing your work. Route: bug fix → append an entry under the `## Bug Fixes` chapter; design or architecture decision → note under `## Design Doc`. Format: one paragraph — what was implemented, any non-obvious decision made, any finding relevant to the remaining saga scope. Do not repeat the PR description. If no decision or finding is worth noting, omit the update.
