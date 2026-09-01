@@ -13,6 +13,12 @@ if [ "$TRIGGER" = "pr_review" ]; then
   echo "stage=pr-opened"         >> "$GITHUB_OUTPUT"
   echo "pr-number=$DETECT_PR"    >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
+elif [ "${AGENT_OUTCOME:-}" = "awaiting_input" ]; then
+  # Blocked with partial work: draft PR may exist. Surface pr-number and branch so the
+  # status card can link the draft PR, but keep stage=awaiting-input (not pr-opened).
+  echo "stage=awaiting-input"    >> "$GITHUB_OUTPUT"
+  echo "pr-number=${FIND_PR:-}"  >> "$GITHUB_OUTPUT"
+  echo "branch=${BRANCH:-}"      >> "$GITHUB_OUTPUT"
 elif [ -n "$FIND_PR" ]; then
   echo "stage=pr-opened"         >> "$GITHUB_OUTPUT"
   echo "pr-number=$FIND_PR"      >> "$GITHUB_OUTPUT"
@@ -46,8 +52,11 @@ elif [ "${MODE:-doing}" = "advising" ] || [ "${MODE:-doing}" = "researching" ]; 
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 else
-  # No PR, no declared outcome — agent posted a clarifying question.
-  echo "stage=awaiting-input"    >> "$GITHUB_OUTPUT"
+  # No PR, no declared outcome — dispatch-result.json was never written.
+  # Automata are required to write it on every exit path; absence means
+  # a pre-agent step (e.g. LSP setup) crashed before the agent ran, or
+  # the agent crashed without writing it. Either way: failed, not a question.
+  echo "stage=failed"            >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 fi
